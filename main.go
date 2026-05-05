@@ -91,8 +91,6 @@ func main() {
 			fmt.Fprintf(w, "\n\n The temperature is %d%s, which is my opinion is %s", period.Temperature, period.TemperatureUnit, tempOpinion(period.Temperature))
 			fmt.Fprintf(w, "\n\n %s", period.DetailedForecast)
 			fmt.Fprintf(w, "\n\n----------------------------------")
-
-			//fmt.Fprintf(w, "\n\n%s: %d %s, %d percent, %s, %s", period.Name, period.Temperature, period.TemperatureUnit, period.ProbabilityOfPrecipitation.Value, period.WindSpeed, period.DetailedForecast)
 		}
 
 	})
@@ -105,20 +103,11 @@ func main() {
 }
 
 func tempOpinion(temp int) string {
-	// TODO parse wind data and apply some kind of modifier. 60 degrees is warm but 60 and windy is just annoying
-	if temp > 100 {
-		return "too hot"
-	} else if temp > 80 {
-		return "hot"
-	} else if temp > 60 {
-		return "warm"
-	} else if temp < 0 {
-		return "Chicago chilly"
-	} else if temp < 40 {
-		return "chilly"
-	} else if temp < 61 {
-		return "sweater weather"
-	} else {
-		return "a temperature"
+	// TODO parse wind data and apply some kind of modifier
+	if temp < 50 {
+		return "cold"
+	} else if temp <= 80 {
+		return "moderate"
 	}
+	return "hot"
 }
