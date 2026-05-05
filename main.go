@@ -38,6 +38,9 @@ func main() {
 	mux := http.NewServeMux()
 	client := &http.Client{Timeout: 10 * time.Second}
 	email := os.Getenv("EMAIL")
+	if email == "" {
+		log.Println("no EMAIL environment variable set, please run EMAIL=email go run main.go")
+	}
 	log.Println("using " + email + " as contact email for weather.gov")
 	userAgent := fmt.Sprintf("(Michael's Weather App, %s)", email)
 
@@ -117,7 +120,6 @@ func main() {
 			http.Error(w, "failed to parse forecast data", http.StatusInternalServerError)
 			return
 		}
-
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 
 		for _, period := range forecastData.Properties.Periods {
