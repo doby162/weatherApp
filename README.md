@@ -1,7 +1,7 @@
 # Welcome to the proof of concept weather app in Go!
 
 ### to run
-1. Git pull the repo, navigate to the project and run `EMAIL={contactEmail} go run main.go
+1. Git pull the repo, navigate to the project and run `EMAIL={contactEmail} go run main.go`
 2. In a browser or curl, run `http://localhost:8080/forecast/41.8832/-87.6324` or any other coordinates (these ones are for Chicago)
 3. Verify the correctness of the weather data by checking the weather for those coordinates via a trusted source!
 
