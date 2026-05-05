@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
+	"time"
 )
 
 type PointData struct {
@@ -33,7 +35,7 @@ type ForecastData struct {
 
 func main() {
 	mux := http.NewServeMux()
-	client := &http.Client{}
+	client := &http.Client{Timeout: 10 * time.Second}
 	email := os.Getenv("EMAIL")
 	fmt.Println("using " + email + " as contact email for weather.gov")
 	userAgent := fmt.Sprintf("(Michael's Weather App, %s)", email)
@@ -41,10 +43,16 @@ func main() {
 	mux.HandleFunc("GET /forecast/{lat}/{lon}", func(w http.ResponseWriter, r *http.Request) {
 		lat := r.PathValue("lat")
 		lon := r.PathValue("lon")
+		valid := validateLatLon(lat, lon)
+		if !valid {
+			http.Error(w, "invalid lat/lon", http.StatusBadRequest)
+			return
+		}
 
 		pointRequest, err := http.NewRequest("GET", fmt.Sprintf("https://api.weather.gov/points/%s,%s", lat, lon), nil)
 		if err != nil {
 			fmt.Println(err)
+			http.Error(w, "failed to construct point request", http.StatusBadGateway)
 			return
 		}
 
@@ -53,6 +61,7 @@ func main() {
 		pointResponse, err := client.Do(pointRequest)
 		if err != nil {
 			fmt.Println(err)
+			http.Error(w, "failed to fetch point data", http.StatusBadGateway)
 			return
 		}
 		defer func(Body io.ReadCloser) {
@@ -64,6 +73,7 @@ func main() {
 
 		if pointResponse.StatusCode != 200 {
 			fmt.Println("Error: ", pointResponse.Status)
+			http.Error(w, pointResponse.Status, http.StatusInternalServerError)
 			return
 		}
 
@@ -71,12 +81,14 @@ func main() {
 		err = json.NewDecoder(pointResponse.Body).Decode(&pointData)
 		if err != nil {
 			fmt.Println("parsing error: ", err)
+			http.Error(w, "failed to parse point data", http.StatusInternalServerError)
 			return
 		}
 
 		forecastRequest, err := http.NewRequest("GET", pointData.Properties.Forecast, nil)
 		if err != nil {
 			fmt.Println(err)
+			http.Error(w, "failed to construct forecast request", http.StatusInternalServerError)
 			return
 		}
 		forecastRequest.Header.Set("User-Agent", userAgent)
@@ -84,6 +96,7 @@ func main() {
 		forecastResponse, err := client.Do(forecastRequest)
 		if err != nil {
 			fmt.Println(err)
+			http.Error(w, "failed to fetch forecast data", http.StatusInternalServerError)
 			return
 		}
 		defer func(Body io.ReadCloser) {
@@ -95,6 +108,7 @@ func main() {
 
 		if forecastResponse.StatusCode != 200 {
 			fmt.Println("Error: ", forecastResponse.Status)
+			http.Error(w, forecastResponse.Status, http.StatusInternalServerError)
 			return
 		}
 
@@ -130,4 +144,17 @@ func temperatureOpinion(temp int) string {
 		return "moderate"
 	}
 	return "hot"
+}
+
+func validateLatLon(lat, lon string) bool {
+	latFloat, err := strconv.ParseFloat(lat, 64)
+	if err != nil || latFloat < -90 || latFloat > 90 {
+		return false
+	}
+
+	lonFloat, err := strconv.ParseFloat(lon, 64)
+	if err != nil || lonFloat < -180 || lonFloat > 180 {
+		return false
+	}
+	return true
 }
