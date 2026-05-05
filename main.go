@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 )
@@ -44,6 +45,7 @@ func main() {
 		pointRequest, err := http.NewRequest("GET", fmt.Sprintf("https://api.weather.gov/points/%s,%s", lat, lon), nil)
 		if err != nil {
 			fmt.Println(err)
+			return
 		}
 
 		pointRequest.Header.Set("User-Agent", userAgent)
@@ -51,8 +53,14 @@ func main() {
 		pointResponse, err := client.Do(pointRequest)
 		if err != nil {
 			fmt.Println(err)
+			return
 		}
-		defer pointResponse.Body.Close()
+		defer func(Body io.ReadCloser) {
+			err := Body.Close()
+			if err != nil {
+				fmt.Println(err)
+			}
+		}(pointResponse.Body)
 
 		if pointResponse.StatusCode != 200 {
 			fmt.Println("Error: ", pointResponse.Status)
@@ -66,14 +74,24 @@ func main() {
 			return
 		}
 
-		forecastRequest, _ := http.NewRequest("GET", pointData.Properties.Forecast, nil)
+		forecastRequest, err := http.NewRequest("GET", pointData.Properties.Forecast, nil)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
 		forecastRequest.Header.Set("User-Agent", userAgent)
 
 		forecastResponse, err := client.Do(forecastRequest)
 		if err != nil {
 			fmt.Println(err)
+			return
 		}
-		defer forecastResponse.Body.Close()
+		defer func(Body io.ReadCloser) {
+			err := Body.Close()
+			if err != nil {
+				fmt.Println(err)
+			}
+		}(forecastResponse.Body)
 
 		if forecastResponse.StatusCode != 200 {
 			fmt.Println("Error: ", forecastResponse.Status)
@@ -83,14 +101,16 @@ func main() {
 		var forecastData ForecastData
 		err = json.NewDecoder(forecastResponse.Body).Decode(&forecastData)
 
-		fmt.Fprintf(w, "Viewing forecast with coords: %s, %s", lat, lon)
-		fmt.Println(pointData.Properties.Forecast)
-
 		for _, period := range forecastData.Properties.Periods {
-			fmt.Fprintf(w, "\n\n%s", period.Name)
-			fmt.Fprintf(w, "\n\n The temperature is %d%s, which is my opinion is %s", period.Temperature, period.TemperatureUnit, tempOpinion(period.Temperature))
-			fmt.Fprintf(w, "\n\n %s", period.DetailedForecast)
-			fmt.Fprintf(w, "\n\n----------------------------------")
+			_, err := fmt.Fprintf(w, "%s\n\n The temperature is %d%s, which is my opinion is %s\n\n %s\n\n----------------------------------\n\n",
+				period.Name,
+				period.Temperature,
+				period.TemperatureUnit,
+				temperatureOpinion(period.Temperature),
+				period.DetailedForecast)
+			if err != nil {
+				return
+			}
 		}
 
 	})
@@ -102,7 +122,7 @@ func main() {
 	}
 }
 
-func tempOpinion(temp int) string {
+func temperatureOpinion(temp int) string {
 	// TODO parse wind data and apply some kind of modifier
 	if temp < 50 {
 		return "cold"
