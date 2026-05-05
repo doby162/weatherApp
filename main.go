@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -85,6 +86,10 @@ func main() {
 			return
 		}
 
+		if !strings.HasPrefix(pointData.Properties.Forecast, "https://api.weather.gov/") {
+			http.Error(w, "invalid forecast URL", http.StatusInternalServerError)
+			return
+		}
 		forecastRequest, err := http.NewRequest("GET", pointData.Properties.Forecast, nil)
 		if err != nil {
 			fmt.Println(err)
@@ -114,9 +119,14 @@ func main() {
 
 		var forecastData ForecastData
 		err = json.NewDecoder(forecastResponse.Body).Decode(&forecastData)
+		if err != nil {
+			fmt.Println("parsing error: ", err)
+			http.Error(w, "failed to parse forecast data", http.StatusInternalServerError)
+			return
+		}
 
 		for _, period := range forecastData.Properties.Periods {
-			_, err := fmt.Fprintf(w, "%s\n\n The temperature is %d%s, which is my opinion is %s\n\n %s\n\n----------------------------------\n\n",
+			_, err := fmt.Fprintf(w, "%s\n\n The temperature is %d%s, which in my opinion is %s\n\n %s\n\n----------------------------------\n\n",
 				period.Name,
 				period.Temperature,
 				period.TemperatureUnit,
@@ -132,7 +142,8 @@ func main() {
 	fmt.Println("Server starting on :8080...")
 	err := http.ListenAndServe(":8080", mux)
 	if err != nil {
-		return
+		fmt.Println("Server error:", err)
+		os.Exit(1)
 	}
 }
 
